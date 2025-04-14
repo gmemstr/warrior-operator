@@ -1,0 +1,14 @@
+apiVersion: warrior.k8s.gmem.ca/v1alpha1
+kind: Warrior
+metadata:
+  name: warrior-name
+spec:
+  project: project-name
+  downloader: your-username
+  scaling:
+    # Minimum number of pods.
+    minimum: 0
+    # Maximum number of pods.
+    maximum: 1
+    # Concurrent jobs per pod.
+    concurrency: 5

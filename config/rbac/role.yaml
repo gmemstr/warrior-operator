@@ -1,0 +1,59 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - warrior.k8s.gmem.ca
+  resources:
+  - warriors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - warrior.k8s.gmem.ca
+  resources:
+  - warriors/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - warrior.k8s.gmem.ca
+  resources:
+  - warriors/status
+  verbs:
+  - get
+  - patch
+  - update

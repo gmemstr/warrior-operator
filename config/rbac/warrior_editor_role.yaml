@@ -1,0 +1,27 @@
+# permissions for end users to edit warriors.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: warrior-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: warrior-editor-role
+rules:
+- apiGroups:
+  - warrior.k8s.gmem.ca
+  resources:
+  - warriors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - warrior.k8s.gmem.ca
+  resources:
+  - warriors/status
+  verbs:
+  - get
