@@ -22,12 +22,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	warriorv1alpha1 "git.gmem.ca/arch/warrior-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -52,16 +53,14 @@ type WarriorReconciler struct {
 const (
 	// typeAvailableMemcached represents the status of the Deployment reconciliation
 	typeAvailableWarrior = "Available"
-	// typeDegradedMemcached represents the status used when the custom resource is deleted and the finalizer operations are yet to occur.
-	typeDegradedWarrior = "Degraded"
 )
 
 // +kubebuilder:rbac:groups=warrior.k8s.gmem.ca,resources=warriors,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=warrior.k8s.gmem.ca,resources=warriors/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=warrior.k8s.gmem.ca,resources=warriors/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -304,7 +303,7 @@ func (r *WarriorReconciler) replicasForWarrior(warrior *warriorv1alpha1.Warrior)
 		fmt.Println("Error making HTTP request:", err)
 		return 0, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

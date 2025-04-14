@@ -18,11 +18,12 @@ package controller
 
 import (
 	"context"
+	"os"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,8 +45,8 @@ var _ = Describe("Warrior Controller", func() {
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind Warrior")
-			err := os.Setenv("WARRIOR_IMAGE_BASE", "atdr.meo.ws/archiveteam")
-			err = k8sClient.Get(ctx, typeNamespacedName, warrior)
+			_ = os.Setenv("WARRIOR_IMAGE_BASE", "atdr.meo.ws/archiveteam")
+			err := k8sClient.Get(ctx, typeNamespacedName, warrior)
 			if err != nil && errors.IsNotFound(err) {
 				resource := &warriorv1alpha1.Warrior{
 					ObjectMeta: metav1.ObjectMeta{
