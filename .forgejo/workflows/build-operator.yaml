@@ -1,0 +1,60 @@
+name: Build and Push Operator Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-amd64:
+    runs-on: debian-amd64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.5.3
+      - name: Login to Docker Hub
+        uses: https://github.com/docker/login-action@v3
+        with:
+          username: arch
+          password: ${{ secrets.REGISTRY_TOKEN }}
+          registry: git.gmem.ca
+      - name: Build and push
+        uses: https://github.com/docker/build-push-action@v6
+        with:
+          push: true
+          tags: git.gmem.ca/arch/warrior-operator:amd64
+
+  build-arm64:
+    runs-on: debian-arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.5.3
+      - name: Login to Docker Hub
+        uses: https://github.com/docker/login-action@v3
+        with:
+          username: arch
+          password: ${{ secrets.REGISTRY_TOKEN }}
+          registry: git.gmem.ca
+      - name: Build and push
+        uses: https://github.com/docker/build-push-action@v6
+        with:
+          push: true
+          tags: git.gmem.ca/arch/warrior-operator:arm64
+
+  merge:
+    runs-on: debian-latest
+    needs: [build-amd64, build-arm64]
+    steps:
+      - name: Login to Docker Hub
+        uses: https://github.com/docker/login-action@v3
+        with:
+          username: arch
+          password: ${{ secrets.REGISTRY_TOKEN }}
+          registry: git.gmem.ca
+      - name: Merge and push manifest
+        run: |
+          docker pull git.gmem.ca/arch/warrior-operator:amd64
+          docker pull git.gmem.ca/arch/warrior-operator:arm64
+          docker manifest create git.gmem.ca/arch/warrior-operator:latest \
+            --amend git.gmem.ca/arch/warrior-operator:amd64 \
+            --amend git.gmem.ca/arch/warrior-operator:arm64
+          docker manifest push git.gmem.ca/arch/warrior-operator:latest
