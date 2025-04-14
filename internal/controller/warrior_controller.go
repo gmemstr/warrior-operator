@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -111,7 +112,7 @@ func (r *WarriorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
-	targetReplicas, err := replicasForWarrior(warrior)
+	targetReplicas, err := r.replicasForWarrior(warrior)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -137,13 +138,13 @@ func (r *WarriorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // deploymentForMemcached returns a Memcached Deployment object
 func (r *WarriorReconciler) deploymentForWarrior(
 	warrior *warriorv1alpha1.Warrior) (*appsv1.Deployment, error) {
-	ls := labelsForWarrior(warrior.Spec.Project)
-	replicas, err := replicasForWarrior(warrior)
+	ls := r.labelsForWarrior(warrior.Spec.Project)
+	replicas, err := r.replicasForWarrior(warrior)
 	if err != nil {
 		return nil, err
 	}
 	// Get the Operand image
-	image, err := imageForWarrior(warrior.Spec.Project)
+	image, err := r.imageForWarrior(warrior.Spec.Project)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +154,7 @@ func (r *WarriorReconciler) deploymentForWarrior(
 		return nil, err
 	}
 
-	resources, err := resourcesForWarrior(warrior)
+	resources, err := r.resourcesForWarrior(warrior)
 	if err != nil {
 		return nil, err
 	}
@@ -262,20 +263,20 @@ type resources struct {
 	memoryRequests resource.Quantity
 }
 
-func resourcesForWarrior(warrior *warriorv1alpha1.Warrior) (resources, error) {
-	cpuLimit, err := resource.ParseQuantity(warrior.Spec.Resources.Limits.CPU)
+func (r *WarriorReconciler) resourcesForWarrior(warrior *warriorv1alpha1.Warrior) (resources, error) {
+	cpuLimit, err := resource.ParseQuantity(cmp.Or(warrior.Spec.Resources.Limits.CPU, "0"))
 	if err != nil {
 		return resources{}, fmt.Errorf("failed to parse CPU limit: %w", err)
 	}
-	memoryLimit, err := resource.ParseQuantity(warrior.Spec.Resources.Limits.Memory)
+	memoryLimit, err := resource.ParseQuantity(cmp.Or(warrior.Spec.Resources.Limits.Memory, "0"))
 	if err != nil {
 		return resources{}, fmt.Errorf("failed to parse memory limit: %w", err)
 	}
-	cpuRequests, err := resource.ParseQuantity(warrior.Spec.Resources.Requests.CPU)
+	cpuRequests, err := resource.ParseQuantity(cmp.Or(warrior.Spec.Resources.Requests.CPU, "0"))
 	if err != nil {
 		return resources{}, fmt.Errorf("failed to parse CPU requests: %w", err)
 	}
-	memoryRequests, err := resource.ParseQuantity(warrior.Spec.Resources.Requests.Memory)
+	memoryRequests, err := resource.ParseQuantity(cmp.Or(warrior.Spec.Resources.Requests.Memory, "0"))
 	if err != nil {
 		return resources{}, fmt.Errorf("failed to parse memory requests: %w", err)
 	}
@@ -296,7 +297,7 @@ type stats struct {
 	} `json:"counts"`
 }
 
-func replicasForWarrior(warrior *warriorv1alpha1.Warrior) (int32, error) {
+func (r *WarriorReconciler) replicasForWarrior(warrior *warriorv1alpha1.Warrior) (int32, error) {
 	url := fmt.Sprintf("https://legacy-api.arpa.li/%s/stats.json", warrior.Spec.Project)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -324,11 +325,9 @@ func replicasForWarrior(warrior *warriorv1alpha1.Warrior) (int32, error) {
 	return int32(warrior.Spec.Scaling.Minimum), nil
 }
 
-// labelsForMemcached returns the labels for selecting the resources
-// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
-func labelsForWarrior(project string) map[string]string {
+func (r *WarriorReconciler) labelsForWarrior(project string) map[string]string {
 	var imageTag string
-	image, err := imageForWarrior(project)
+	image, err := r.imageForWarrior(project)
 	if err == nil {
 		imageTag = strings.Split(image, ":")[1]
 	}
@@ -340,9 +339,7 @@ func labelsForWarrior(project string) map[string]string {
 	}
 }
 
-// imageForMemcached gets the Operand image which is managed by this controller
-// from the MEMCACHED_IMAGE environment variable defined in the config/manager/manager.yaml
-func imageForWarrior(project string) (string, error) {
+func (r *WarriorReconciler) imageForWarrior(project string) (string, error) {
 	var imageEnvVar = "WARRIOR_IMAGE_BASE"
 	image, found := os.LookupEnv(imageEnvVar)
 	if !found {
