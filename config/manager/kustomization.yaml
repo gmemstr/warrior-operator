@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: git.gmem.ca/arch/warrior-operator
-  newTag: testing
+  newTag: latest
