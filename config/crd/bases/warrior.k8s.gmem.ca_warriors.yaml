@@ -45,6 +45,43 @@ spec:
                 type: string
               project:
                 type: string
+              resources:
+                default:
+                  limits:
+                    cpu: "0"
+                    memory: "0"
+                  requests:
+                    cpu: "0"
+                    memory: "0"
+                properties:
+                  limits:
+                    properties:
+                      cpu:
+                        default: "0"
+                        type: string
+                      memory:
+                        default: "0"
+                        type: string
+                    required:
+                    - cpu
+                    - memory
+                    type: object
+                  requests:
+                    properties:
+                      cpu:
+                        default: "0"
+                        type: string
+                      memory:
+                        default: "0"
+                        type: string
+                    required:
+                    - cpu
+                    - memory
+                    type: object
+                required:
+                - limits
+                - requests
+                type: object
               scaling:
                 default:
                   concurrency: 5
@@ -54,9 +91,10 @@ spec:
                     default: 5
                     type: integer
                   maximum:
-                    default: 1
+                    default: 0
                     type: integer
                   minimum:
+                    default: 0
                     type: integer
                 required:
                 - concurrency

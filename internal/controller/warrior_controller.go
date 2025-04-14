@@ -75,7 +75,7 @@ func (r *WarriorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	found := &appsv1.Deployment{}
-	err = r.Get(ctx, types.NamespacedName{Name: warrior.Name, Namespace: warrior.Namespace}, found)
+	err = r.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("%s-warrior", warrior.Name), Namespace: warrior.Namespace}, found)
 	if err != nil && apierrors.IsNotFound(err) {
 		// Define a new deployment
 		dep, err := r.deploymentForWarrior(warrior)
@@ -153,10 +153,16 @@ func (r *WarriorReconciler) deploymentForWarrior(
 		return nil, err
 	}
 
+	resources, err := resourcesForWarrior(warrior)
+	if err != nil {
+		return nil, err
+	}
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      warrior.Name,
+			Name:      fmt.Sprintf("%s-warrior", warrior.Name),
 			Namespace: warrior.Namespace,
+			Labels:    ls,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -216,6 +222,16 @@ func (r *WarriorReconciler) deploymentForWarrior(
 						VolumeMounts: []corev1.VolumeMount{
 							{MountPath: "/grab/data", Name: "cache"},
 						},
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								"cpu":    resources.cpuLimit,
+								"memory": resources.memoryLimit,
+							},
+							Requests: corev1.ResourceList{
+								"cpu":    resources.cpuRequests,
+								"memory": resources.memoryRequests,
+							},
+						},
 						SecurityContext: &corev1.SecurityContext{
 							RunAsNonRoot:             &[]bool{true}[0],
 							RunAsUser:                &[]int64{1001}[0],
@@ -237,6 +253,38 @@ func (r *WarriorReconciler) deploymentForWarrior(
 		return nil, err
 	}
 	return dep, nil
+}
+
+type resources struct {
+	cpuLimit       resource.Quantity
+	memoryLimit    resource.Quantity
+	cpuRequests    resource.Quantity
+	memoryRequests resource.Quantity
+}
+
+func resourcesForWarrior(warrior *warriorv1alpha1.Warrior) (resources, error) {
+	cpuLimit, err := resource.ParseQuantity(warrior.Spec.Resources.Limits.CPU)
+	if err != nil {
+		return resources{}, fmt.Errorf("failed to parse CPU limit: %w", err)
+	}
+	memoryLimit, err := resource.ParseQuantity(warrior.Spec.Resources.Limits.Memory)
+	if err != nil {
+		return resources{}, fmt.Errorf("failed to parse memory limit: %w", err)
+	}
+	cpuRequests, err := resource.ParseQuantity(warrior.Spec.Resources.Requests.CPU)
+	if err != nil {
+		return resources{}, fmt.Errorf("failed to parse CPU requests: %w", err)
+	}
+	memoryRequests, err := resource.ParseQuantity(warrior.Spec.Resources.Requests.Memory)
+	if err != nil {
+		return resources{}, fmt.Errorf("failed to parse memory requests: %w", err)
+	}
+	return resources{
+		cpuLimit,
+		memoryLimit,
+		cpuRequests,
+		memoryRequests,
+	}, nil
 }
 
 type stats struct {
@@ -284,9 +332,11 @@ func labelsForWarrior(project string) map[string]string {
 	if err == nil {
 		imageTag = strings.Split(image, ":")[1]
 	}
-	return map[string]string{"app.kubernetes.io/name": "warrior-operator",
+	return map[string]string{
+		"app.kubernetes.io/name":       "warrior-operator",
 		"app.kubernetes.io/version":    imageTag,
 		"app.kubernetes.io/managed-by": "WarriorController",
+		"warrior.k8s.gmem.ca/project":  project,
 	}
 }
 

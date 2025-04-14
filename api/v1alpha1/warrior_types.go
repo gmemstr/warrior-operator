@@ -32,14 +32,29 @@ type WarriorSpec struct {
 	Downloader string `json:"downloader,omitempty"`
 	// +kubebuilder:default:={"maximum":1,"concurrency":5}
 	Scaling WarriorScaling `json:"scaling,omitempty"`
+	// +kubebuilder:default:={"limits":{"cpu":"0","memory":"0"},"requests":{"cpu":"0","memory":"0"}}
+	Resources WarriorResources `json:"resources,omitempty"`
 }
 
 type WarriorScaling struct {
+	// +kubebuilder:default:=0
 	Minimum int `json:"minimum,omitempty"`
-	// +kubebuilder:default:=1
+	// +kubebuilder:default:=0
 	Maximum int `json:"maximum"`
 	// +kubebuilder:default:=5
 	Concurrency int `json:"concurrency"`
+}
+
+type WarriorResources struct {
+	Limits   Resources `json:"limits"`
+	Requests Resources `json:"requests"`
+}
+
+type Resources struct {
+	// +kubebuilder:default:="0"
+	CPU string `json:"cpu"`
+	// +kubebuilder:default:="0"
+	Memory string `json:"memory"`
 }
 
 // WarriorStatus defines the observed state of Warrior
