@@ -113,6 +113,8 @@ kubectl apply -f https://raw.githubusercontent.com/<org>/warrior-operator/<tag o
 
 ## Contributing
 
+Pull requests and issues are accepted [on GitHub](https://github.com/gmemstr/warrior-operator) or via email.
+
 **NOTE:** Run `make help` for more information on all potential `make` targets
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
