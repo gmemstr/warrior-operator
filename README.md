@@ -12,29 +12,47 @@ warrior and get going!
 apiVersion: "warrior.k8s.gmem.ca/v1alpha1"
 kind: Warrior
 metadata:
-  name: warrior-name
-  namespace: archiveteam-warrior
+  name: twitch
 spec:
-  project: project-name
-  downloader: your-username
+  project: twitch # Project to work on
+  downloader: arch-dog # Your own downloader name for credit!
   scaling:
-    # Minimum number of pods.
-    minimum: 0
-    # Maximum number of pods.
-    maximum: 1
-    # Concurrent jobs per pod.
-    concurrency: 5
+    minimum: 0 # Minimum number of pods to run
+    maximum: 5 # Maximum number of pods to run
+    concurrency: 5 # Concurrent jobs per pod.
+  resources: # Resource limits and requests for the pods
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+    requests:
+      cpu: "1m"
+      memory: "256Mi"
 ```
 
-## Getting Started
+Each pod is given a 512MiB "cache" directory in-memory to avoid trashing disks.
 
-### Prerequisites
+## Installing
+
+```sh
+# Forgejo
+kubectl apply -f https://git.gmem.ca/arch/warrior-operator/raw/branch/main/dist/install.yaml
+# GitHub
+kubectl apply -f https://raw.githubusercontent.com/gmemstr/warrior-operator/refs/heads/main/dist/install.yaml
+```
+
+## Contributing
+
+Pull requests and issues are accepted [on GitHub](https://github.com/gmemstr/warrior-operator) or via email.
+
+### Getting Started
+
+#### Prerequisites
 - go version v1.22.0+
 - docker version 17.03+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
+#### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
@@ -87,38 +105,6 @@ make uninstall
 ```sh
 make undeploy
 ```
-
-## Project Distribution
-
-Following are the steps to build the installer and distribute this project to users.
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/warrior-operator:tag
-```
-
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
-
-2. Using the installer
-
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/warrior-operator/<tag or branch>/dist/install.yaml
-```
-
-## Contributing
-
-Pull requests and issues are accepted [on GitHub](https://github.com/gmemstr/warrior-operator) or via email.
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
 ## License
 
 Copyright 2025.

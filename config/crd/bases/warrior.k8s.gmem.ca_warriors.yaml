@@ -17,9 +17,7 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: |-
-          Warrior is the Schema for the warriors API
-          //+kubebuilder:subresource:status
+        description: Warrior is the Schema for the warriors API
         properties:
           apiVersion:
             description: |-

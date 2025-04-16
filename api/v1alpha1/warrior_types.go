@@ -69,7 +69,6 @@ type WarriorStatus struct {
 // +kubebuilder:subresource:status
 
 // Warrior is the Schema for the warriors API
-// //+kubebuilder:subresource:status
 type Warrior struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
