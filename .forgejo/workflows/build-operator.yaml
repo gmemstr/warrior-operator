@@ -50,11 +50,26 @@ jobs:
           username: arch
           password: ${{ secrets.REGISTRY_TOKEN }}
           registry: git.gmem.ca
+      - name: Login to Docker Hub
+        uses: https://github.com/docker/login-action@v3
+        with:
+          username: gmemstr
+          password: ${{ secrets.GHCR_REGISTRY_TOKEN }}
+          registry: ghcr.io
       - name: Merge and push manifest
         run: |
+          echo "Pulling, merging and pushing to Forgejo"
           docker pull git.gmem.ca/arch/warrior-operator:amd64
           docker pull git.gmem.ca/arch/warrior-operator:arm64
           docker manifest create git.gmem.ca/arch/warrior-operator:latest \
             --amend git.gmem.ca/arch/warrior-operator:amd64 \
             --amend git.gmem.ca/arch/warrior-operator:arm64
-          docker manifest push git.gmem.ca/arch/warrior-operator:latest
+          echo "Mirroring to ghcr.io"
+          docker tag git.gmem.ca/arch/warrior-operator:amd64 ghcr.io/gmemstr/warrior-operator:amd64
+          docker tag git.gmem.ca/arch/warrior-operator:arm64 ghcr.io/gmemstr/warrior-operator:arm64
+          docker push ghcr.io/gmemstr/warrior-operator:amd64
+          docker push ghcr.io/gmemstr/warrior-operator:arm64
+          docker manifest create ghcr.io/gmemstr/warrior-operator:latest \
+            --amend ghcr.io/gmemstr/warrior-operator:amd64 \
+            --amend ghcr.io/gmemstr/warrior-operator:arm64
+          docker manifest push ghcr.io/gmemstr/warrior-operator:latest

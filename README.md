@@ -40,6 +40,11 @@ kubectl apply -f https://git.gmem.ca/arch/warrior-operator/raw/branch/main/dist/
 kubectl apply -f https://raw.githubusercontent.com/gmemstr/warrior-operator/refs/heads/main/dist/install.yaml
 ```
 
+Images are mirrored to ghcr.io.
+
+* `git.gmem.ca/arch/warrior-operator:latest`
+* `ghcr.io/gmemstr/warrior-operator:latest`
+
 ## Contributing
 
 Pull requests and issues are accepted [on GitHub](https://github.com/gmemstr/warrior-operator) or via email.
