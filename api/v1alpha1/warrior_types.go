@@ -32,7 +32,7 @@ type WarriorSpec struct {
 	Downloader string `json:"downloader,omitempty"`
 	// +kubebuilder:default:={"maximum":1,"concurrency":5}
 	Scaling WarriorScaling `json:"scaling,omitempty"`
-	// +kubebuilder:default:={"limits":{"cpu":"0","memory":"0"},"requests":{"cpu":"0","memory":"0"}}
+	// +kubebuilder:default:={"limits":{"cpu":"0","memory":"0"},"requests":{"cpu":"0","memory":"0"},"cacheSize":"500Mi"}
 	Resources WarriorResources `json:"resources,omitempty"`
 }
 

@@ -45,6 +45,7 @@ spec:
                 type: string
               resources:
                 default:
+                  cacheSize: 500Mi
                   limits:
                     cpu: "0"
                     memory: "0"
