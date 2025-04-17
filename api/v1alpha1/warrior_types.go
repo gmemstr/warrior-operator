@@ -45,9 +45,13 @@ type WarriorScaling struct {
 	Concurrency int `json:"concurrency"`
 }
 
+// WarriorResources defines the resource limits and requests that individual
+// warrior pods can use. The cacheSize (in-memory volume) can also be limited.
 type WarriorResources struct {
-	Limits   Resources `json:"limits"`
-	Requests Resources `json:"requests"`
+	// +kubebuilder:default:="500Mi"
+	CacheSize string    `json:"cacheSize"`
+	Limits    Resources `json:"limits"`
+	Requests  Resources `json:"requests"`
 }
 
 type Resources struct {

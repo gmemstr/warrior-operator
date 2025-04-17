@@ -148,11 +148,6 @@ func (r *WarriorReconciler) deploymentForWarrior(
 		return nil, err
 	}
 
-	cacheSize, err := resource.ParseQuantity("512Mi")
-	if err != nil {
-		return nil, err
-	}
-
 	resources, err := r.resourcesForWarrior(warrior)
 	if err != nil {
 		return nil, err
@@ -178,7 +173,7 @@ func (r *WarriorReconciler) deploymentForWarrior(
 						{Name: "cache", VolumeSource: corev1.VolumeSource{
 							EmptyDir: &corev1.EmptyDirVolumeSource{
 								Medium:    "Memory",
-								SizeLimit: &cacheSize,
+								SizeLimit: &resources.cacheSize,
 							}},
 						},
 					},
@@ -260,6 +255,7 @@ type resources struct {
 	memoryLimit    resource.Quantity
 	cpuRequests    resource.Quantity
 	memoryRequests resource.Quantity
+	cacheSize      resource.Quantity
 }
 
 func (r *WarriorReconciler) resourcesForWarrior(warrior *warriorv1alpha1.Warrior) (resources, error) {
@@ -279,11 +275,16 @@ func (r *WarriorReconciler) resourcesForWarrior(warrior *warriorv1alpha1.Warrior
 	if err != nil {
 		return resources{}, fmt.Errorf("failed to parse memory requests: %w", err)
 	}
+	cacheSize, err := resource.ParseQuantity(cmp.Or(warrior.Spec.Resources.CacheSize, "500Mi"))
+	if err != nil {
+		return resources{}, fmt.Errorf("failed to parse cache size: %w", err)
+	}
 	return resources{
 		cpuLimit,
 		memoryLimit,
 		cpuRequests,
 		memoryRequests,
+		cacheSize,
 	}, nil
 }
 

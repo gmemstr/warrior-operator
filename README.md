@@ -21,6 +21,7 @@ spec:
     maximum: 5 # Maximum number of pods to run
     concurrency: 5 # Concurrent jobs per pod.
   resources: # Resource limits and requests for the pods
+    cacheSize: 500Mi # Size of the memory cache volume
     limits:
       cpu: "1"
       memory: "1Gi"
@@ -28,8 +29,6 @@ spec:
       cpu: "1m"
       memory: "256Mi"
 ```
-
-Each pod is given a 512MiB "cache" directory in-memory to avoid trashing disks.
 
 ## Installing
 

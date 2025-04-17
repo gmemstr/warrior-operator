@@ -51,7 +51,13 @@ spec:
                   requests:
                     cpu: "0"
                     memory: "0"
+                description: |-
+                  WarriorResources defines the resource limits and requests that individual
+                  warrior pods can use. The cacheSize (in-memory volume) can also be limited.
                 properties:
+                  cacheSize:
+                    default: 500Mi
+                    type: string
                   limits:
                     properties:
                       cpu:
@@ -77,6 +83,7 @@ spec:
                     - memory
                     type: object
                 required:
+                - cacheSize
                 - limits
                 - requests
                 type: object
