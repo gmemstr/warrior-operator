@@ -1,4 +1,4 @@
-name: Build and Push Operator Image
+name: Test, build and push operator
 
 on:
   push:
@@ -6,7 +6,19 @@ on:
       - main
 
 jobs:
+  test:
+    runs-on: debian-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.5.3
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+      - run: make lint
+      - run: make test
+
   build-amd64:
+    needs: [ test ]
     runs-on: debian-amd64
     steps:
       - name: Checkout code
@@ -30,6 +42,7 @@ jobs:
           tags: git.gmem.ca/arch/warrior-operator:amd64,ghcr.io/gmemstr/warrior-operator:amd64
 
   build-arm64:
+    needs: [ test ]
     runs-on: debian-arm64
     steps:
       - name: Checkout code
@@ -54,7 +67,7 @@ jobs:
 
   merge:
     runs-on: debian-latest
-    needs: [build-amd64, build-arm64]
+    needs: [ build-amd64, build-arm64 ]
     steps:
       - name: Login to container registry
         uses: https://github.com/docker/login-action@v3
