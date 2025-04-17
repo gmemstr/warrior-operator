@@ -53,6 +53,8 @@ type WarriorReconciler struct {
 const (
 	// typeAvailableMemcached represents the status of the Deployment reconciliation
 	typeAvailableWarrior = "Available"
+	VAR_DOWNLOADER       = "DOWNLOADER"
+	VAR_CONCURRENT_ITEMS = "CONCURRENT_ITEMS"
 )
 
 // +kubebuilder:rbac:groups=warrior.k8s.gmem.ca,resources=warriors,verbs=get;list;watch;create;update;patch;delete
@@ -111,18 +113,54 @@ func (r *WarriorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
+	shouldUpdate := false
 	targetReplicas, err := r.replicasForWarrior(warrior)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	if *found.Spec.Replicas != targetReplicas {
 		found.Spec.Replicas = &targetReplicas
+		shouldUpdate = true
+	}
+	resources, err := r.resourcesForWarrior(warrior)
+	if err != nil {
+		return ctrl.Result{}, nil
+	}
+	newResources := corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			"cpu":    resources.cpuLimit,
+			"memory": resources.memoryLimit,
+		},
+		Requests: corev1.ResourceList{
+			"cpu":    resources.cpuRequests,
+			"memory": resources.memoryRequests,
+		},
+	}
+	if &newResources != found.Spec.Template.Spec.Resources {
+		found.Spec.Template.Spec.Resources = &newResources
+		shouldUpdate = true
+	}
+	if &resources.cacheSize != found.Spec.Template.Spec.Volumes[0].EmptyDir.SizeLimit {
+		found.Spec.Template.Spec.Volumes[0].EmptyDir.SizeLimit = &resources.cacheSize
+		shouldUpdate = true
+	}
+	for i, v := range found.Spec.Template.Spec.Containers[0].Env {
+		if v.Name == VAR_DOWNLOADER && v.Value != warrior.Spec.Downloader {
+			found.Spec.Template.Spec.Containers[0].Env[i].Value = warrior.Spec.Downloader
+			shouldUpdate = true
+		}
+		if v.Name == VAR_CONCURRENT_ITEMS && v.Value != strconv.Itoa(warrior.Spec.Scaling.Concurrency) {
+			found.Spec.Template.Spec.Containers[0].Env[i].Value = strconv.Itoa(warrior.Spec.Scaling.Concurrency)
+			shouldUpdate = true
+		}
+	}
+
+	if shouldUpdate {
 		if err = r.Update(ctx, found); err != nil {
 			log.Error(err, "Failed to update Deployment replicas")
 			return ctrl.Result{}, nil
 		}
 	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -211,8 +249,8 @@ func (r *WarriorReconciler) deploymentForWarrior(
 						Name:            "warrior",
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Env: []corev1.EnvVar{
-							{Name: "CONCURRENT_ITEMS", Value: strconv.Itoa(warrior.Spec.Scaling.Concurrency)},
-							{Name: "DOWNLOADER", Value: warrior.Spec.Downloader},
+							{Name: VAR_CONCURRENT_ITEMS, Value: strconv.Itoa(warrior.Spec.Scaling.Concurrency)},
+							{Name: VAR_DOWNLOADER, Value: warrior.Spec.Downloader},
 						},
 						VolumeMounts: []corev1.VolumeMount{
 							{MountPath: "/grab/data", Name: "cache"},
@@ -305,6 +343,11 @@ func (r *WarriorReconciler) replicasForWarrior(warrior *warriorv1alpha1.Warrior)
 		return 0, err
 	}
 	defer resp.Body.Close() //nolint
+
+	if resp.StatusCode > 299 {
+		fmt.Println("Error fetching stats, no project?", err)
+		return 0, err
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

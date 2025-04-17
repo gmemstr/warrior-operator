@@ -18,11 +18,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -39,7 +42,11 @@ var _ = Describe("Warrior Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
+		}
+		typeNamespacedNameWarrior := types.NamespacedName{
+			Name:      fmt.Sprintf("%s-warrior", resourceName),
+			Namespace: "default",
 		}
 		warrior := &warriorv1alpha1.Warrior{}
 
@@ -54,7 +61,7 @@ var _ = Describe("Warrior Controller", func() {
 						Namespace: "default",
 					},
 					Spec: warriorv1alpha1.WarriorSpec{
-						Project: "usgovernment",
+						Project: "cohost",
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
@@ -81,8 +88,124 @@ var _ = Describe("Warrior Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+		})
+		It("should successfully change minimum scale", func() {
+			By("Reconciling the created resource")
+			controllerReconciler := &WarriorReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			err = k8sClient.Get(ctx, typeNamespacedNameWarrior, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*deployment.Spec.Replicas).To(Equal(int32(0)))
+
+			resource := &warriorv1alpha1.Warrior{}
+			err = k8sClient.Get(ctx, typeNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+			resource.Spec.Scaling.Minimum = 1
+			err = k8sClient.Update(ctx, resource)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, typeNamespacedNameWarrior, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*deployment.Spec.Replicas).To(Equal(int32(1)))
+		})
+
+		It("should successfully change downloader and concurrency", func() {
+			By("Reconciling the created resource")
+			controllerReconciler := &WarriorReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			err = k8sClient.Get(ctx, typeNamespacedNameWarrior, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			for _, v := range deployment.Spec.Template.Spec.Containers[0].Env {
+				if v.Name == VAR_DOWNLOADER {
+					Expect(v.Value).To(Equal(""))
+				}
+				if v.Name == VAR_CONCURRENT_ITEMS {
+					Expect(v.Value).To(Equal("0"))
+				}
+			}
+
+			resource := &warriorv1alpha1.Warrior{}
+			err = k8sClient.Get(ctx, typeNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+			resource.Spec.Downloader = "test"
+			resource.Spec.Scaling.Concurrency = 5
+			err = k8sClient.Update(ctx, resource)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, typeNamespacedNameWarrior, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			for _, v := range deployment.Spec.Template.Spec.Containers[0].Env {
+				if v.Name == VAR_DOWNLOADER {
+					Expect(v.Value).To(Equal("test"))
+				}
+				if v.Name == VAR_CONCURRENT_ITEMS {
+					Expect(v.Value).To(Equal("5"))
+				}
+			}
+		})
+
+		It("should successfully change cache size", func() {
+			By("Reconciling the created resource")
+			controllerReconciler := &WarriorReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			defaultSize, err := k8sresource.ParseQuantity("500Mi")
+			Expect(err).NotTo(HaveOccurred())
+
+			deployment := &appsv1.Deployment{}
+			err = k8sClient.Get(ctx, typeNamespacedNameWarrior, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*deployment.Spec.Template.Spec.Volumes[0].EmptyDir.SizeLimit).To(Equal(defaultSize))
+
+			newSize, err := k8sresource.ParseQuantity("10Mi")
+			Expect(err).NotTo(HaveOccurred())
+			resource := &warriorv1alpha1.Warrior{}
+			err = k8sClient.Get(ctx, typeNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+			resource.Spec.Resources.CacheSize = newSize.String()
+			err = k8sClient.Update(ctx, resource)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, typeNamespacedNameWarrior, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*deployment.Spec.Template.Spec.Volumes[0].EmptyDir.SizeLimit).To(Equal(newSize))
 		})
 	})
 })
