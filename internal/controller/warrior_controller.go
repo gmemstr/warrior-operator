@@ -28,16 +28,16 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	warriorv1alpha1 "git.gmem.ca/arch/warrior-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -69,7 +69,6 @@ const (
 func (r *WarriorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
 	warrior := &warriorv1alpha1.Warrior{}
 	err := r.Get(ctx, req.NamespacedName, warrior)
 	if err != nil {
@@ -104,6 +103,11 @@ func (r *WarriorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				"Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			return ctrl.Result{}, err
 		}
+		meta.SetStatusCondition(&warrior.Status.Conditions, metav1.Condition{
+			Type:   typeAvailableWarrior,
+			Status: metav1.ConditionTrue, Reason: "Reconciling",
+			Message: fmt.Sprintf("Deployment for custom resource (%s) created successfully", warrior.Name),
+		})
 
 		// Deployment created successfully
 		// We will requeue the reconciliation so that we can ensure the state
@@ -113,14 +117,9 @@ func (r *WarriorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
-	shouldUpdate := false
 	targetReplicas, err := r.replicasForWarrior(warrior)
 	if err != nil {
 		return ctrl.Result{}, err
-	}
-	if *found.Spec.Replicas != targetReplicas {
-		found.Spec.Replicas = &targetReplicas
-		shouldUpdate = true
 	}
 	resources, err := r.resourcesForWarrior(warrior)
 	if err != nil {
@@ -136,31 +135,72 @@ func (r *WarriorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			"memory": resources.memoryRequests,
 		},
 	}
-	if &newResources != found.Spec.Template.Spec.Resources {
-		found.Spec.Template.Spec.Resources = &newResources
-		shouldUpdate = true
-	}
-	if &resources.cacheSize != found.Spec.Template.Spec.Volumes[0].EmptyDir.SizeLimit {
-		found.Spec.Template.Spec.Volumes[0].EmptyDir.SizeLimit = &resources.cacheSize
-		shouldUpdate = true
-	}
-	for i, v := range found.Spec.Template.Spec.Containers[0].Env {
-		if v.Name == VAR_DOWNLOADER && v.Value != warrior.Spec.Downloader {
-			found.Spec.Template.Spec.Containers[0].Env[i].Value = warrior.Spec.Downloader
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		err = r.Get(ctx, types.NamespacedName{Name: fmt.Sprintf("%s-warrior", warrior.Name), Namespace: warrior.Namespace}, found)
+
+		shouldUpdate := false
+		if *found.Spec.Replicas != targetReplicas {
+			found.Spec.Replicas = &targetReplicas
 			shouldUpdate = true
 		}
-		if v.Name == VAR_CONCURRENT_ITEMS && v.Value != strconv.Itoa(warrior.Spec.Scaling.Concurrency) {
-			found.Spec.Template.Spec.Containers[0].Env[i].Value = strconv.Itoa(warrior.Spec.Scaling.Concurrency)
+		if &newResources != found.Spec.Template.Spec.Resources {
+			found.Spec.Template.Spec.Resources = &newResources
 			shouldUpdate = true
 		}
+		if &resources.cacheSize != found.Spec.Template.Spec.Volumes[0].EmptyDir.SizeLimit {
+			found.Spec.Template.Spec.Volumes[0].EmptyDir.SizeLimit = &resources.cacheSize
+			shouldUpdate = true
+		}
+		for i, v := range found.Spec.Template.Spec.Containers[0].Env {
+			if v.Name == VAR_DOWNLOADER && v.Value != warrior.Spec.Downloader {
+				found.Spec.Template.Spec.Containers[0].Env[i].Value = warrior.Spec.Downloader
+				shouldUpdate = true
+			}
+			if v.Name == VAR_CONCURRENT_ITEMS && v.Value != strconv.Itoa(warrior.Spec.Scaling.Concurrency) {
+				found.Spec.Template.Spec.Containers[0].Env[i].Value = strconv.Itoa(warrior.Spec.Scaling.Concurrency)
+				shouldUpdate = true
+			}
+		}
+
+		if shouldUpdate {
+			return r.Update(ctx, found)
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error(err, "Failed to update Deployment")
+
+		if err := r.Get(ctx, req.NamespacedName, warrior); err != nil {
+			log.Error(err, "Failed to re-fetch Warrior")
+			return ctrl.Result{}, err
+		}
+
+		// The following implementation will update the status
+		meta.SetStatusCondition(&warrior.Status.Conditions, metav1.Condition{
+			Type:   typeAvailableWarrior,
+			Status: metav1.ConditionFalse, Reason: "Reconciling",
+			Message: fmt.Sprintf("Failed to update deployment (%s): (%s)", found.Name, err)})
+
+		if err := r.Status().Update(ctx, warrior); err != nil {
+			log.Error(err, "Failed to update Warrior status")
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, err
 	}
 
-	if shouldUpdate {
-		if err = r.Update(ctx, found); err != nil {
-			log.Error(err, "Failed to update Deployment replicas")
-			return ctrl.Result{}, nil
-		}
+	meta.SetStatusCondition(&warrior.Status.Conditions, metav1.Condition{
+		Type:   typeAvailableWarrior,
+		Status: metav1.ConditionTrue, Reason: "Reconciling",
+		Message: fmt.Sprintf("Deployment for custom resource (%s) with %d replicas updated successfully", warrior.Name, targetReplicas),
+	})
+
+	if err := r.Status().Update(ctx, warrior); err != nil {
+		log.Error(err, "Failed to update Warrior status")
+		return ctrl.Result{}, err
 	}
+
 	return ctrl.Result{}, nil
 }
 

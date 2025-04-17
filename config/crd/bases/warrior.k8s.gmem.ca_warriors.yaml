@@ -171,10 +171,6 @@ spec:
                   - type
                   type: object
                 type: array
-              pod_count:
-                type: integer
-            required:
-            - pod_count
             type: object
         type: object
     served: true

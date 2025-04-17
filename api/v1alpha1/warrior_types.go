@@ -66,7 +66,6 @@ type WarriorStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
-	PodCount   int                `json:"pod_count"`
 }
 
 // +kubebuilder:object:root=true
